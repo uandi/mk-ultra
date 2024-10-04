@@ -1,36 +1,48 @@
 #!/bin/bash
-# Script to activate virtual environment and start ComfyUI
+# Enhanced script to activate virtual environment, check required models, and start ComfyUI with MPS support
 
-# Navigate to the script's directory
+# Navigate to the script's directory (ComfyUI root directory)
 cd "$(dirname "$0")"
 
-# Optionally disable MPS if you'd like to force everything on CPU
-# Uncomment the following line if you want to disable MPS
-# export PYTORCH_DISABLE_MPS=1
-
 # Activate the virtual environment
-source venv/bin/activate
-
-# Check if torch is using MPS
-if python -c "import torch; assert torch.has_mps, 'MPS not available'; print('MPS is available.')" 2>/dev/null; then
-    echo "Using MPS backend for most tasks"
+if [ -d "venv" ]; then
+    source venv/bin/activate
 else
-    echo "MPS not available, forcing CPU mode"
-    export PYTORCH_DISABLE_MPS=1
+    echo "Virtual environment not found. Please run setup_comfyui_models.sh first."
+    exit 1
 fi
 
-# Patch the VAEEncodeForInpaint to use CPU for the specific convolution operations
-PATCH_FILE="comfy/ldm/models/autoencoder.py"
-PATCH_PATTERN="samples\[x:x\+batch_number\] = self.first_stage_model.encode(pixels_in).to(self.output_device).float()"
-PATCH_REPLACEMENT="samples[x:x+batch_number] = self.first_stage_model.encode(pixels_in).to('cpu').float()"
+# Check for required models
+declare -A required_models
+required_models=(
+    ["models/checkpoints"]="Base Model (.ckpt or .safetensors)"
+    ["models/vae"]="VAE Model (.ckpt or .safetensors)"
+    ["models/configs"]="Model Config Files (.yaml)"
+)
 
-if grep -q "$PATCH_PATTERN" "$PATCH_FILE"; then
-    echo "Patching $PATCH_FILE to use CPU for VAE encoding..."
-    sed -i.bak "s|$PATCH_PATTERN|$PATCH_REPLACEMENT|" "$PATCH_FILE"
-    echo "Patch applied."
+missing_models=false
+
+echo "Checking for required models..."
+for dir in "${!required_models[@]}"; do
+    if [ -d "$dir" ]; then
+        files_count=$(ls -1q "$dir"/* 2>/dev/null | wc -l)
+        if [ "$files_count" -eq 0 ]; then
+            echo "Missing ${required_models[$dir]} in $dir"
+            missing_models=true
+        fi
+    else
+        echo "Directory $dir does not exist. Please run setup_comfyui_models.sh."
+        exit 1
+    fi
+done
+
+if [ "$missing_models" = true ]; then
+    echo "Some required models are missing. Please run setup_comfyui_models.sh."
+    exit 1
 else
-    echo "Patch already applied or not needed."
+    echo "All required models are present."
 fi
 
-# Run ComfyUI
+# Start ComfyUI
+echo "Starting ComfyUI..."
 python main.py
