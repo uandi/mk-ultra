@@ -1,3 +1,5 @@
+![Example Image](web/example.png)
+
 # ComfyUI Installation Guide on Mac with ARM Chip (Apple Silicon)
 
 This README provides a comprehensive, step-by-step guide to installing **ComfyUI** on a Mac with an ARM chip (Apple Silicon). It incorporates all necessary fixes and adjustments to ensure a smooth installation, including the specific command to create a virtual environment with Python 3.10.
